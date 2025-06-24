@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<XMLDB PATH="local/alx_report_api/db" VERSION="20240115" COMMENT="XMLDB file for Moodle local/alx_report_api"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd"
+>
+  <TABLES>
+    <TABLE NAME="local_alx_api_logs" COMMENT="API access logs for the ALX Report API plugin">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" COMMENT="ID of the user making the API request"/>
+        <FIELD NAME="companyid" TYPE="int" LENGTH="10" NOTNULL="true" COMMENT="ID of the company the user belongs to"/>
+        <FIELD NAME="endpoint" TYPE="char" LENGTH="255" NOTNULL="true" COMMENT="API endpoint that was called"/>
+        <FIELD NAME="ipaddress" TYPE="char" LENGTH="45" NOTNULL="false" COMMENT="IP address of the request"/>
+        <FIELD NAME="useragent" TYPE="text" NOTNULL="false" COMMENT="User agent string"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" COMMENT="Timestamp when the request was made"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="userid" UNIQUE="false" FIELDS="userid"/>
+        <INDEX NAME="companyid" UNIQUE="false" FIELDS="companyid"/>
+        <INDEX NAME="timecreated" UNIQUE="false" FIELDS="timecreated"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="local_alx_api_settings" COMMENT="Company-specific API settings for the ALX Report API plugin">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="companyid" TYPE="int" LENGTH="10" NOTNULL="true" COMMENT="ID of the company"/>
+        <FIELD NAME="setting_name" TYPE="char" LENGTH="100" NOTNULL="true" COMMENT="Name of the setting (field_email, course_10, etc.)"/>
+        <FIELD NAME="setting_value" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" COMMENT="Value of the setting (1=enabled, 0=disabled)"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" COMMENT="Timestamp when the setting was created"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" COMMENT="Timestamp when the setting was last modified"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="unique_company_setting" TYPE="unique" FIELDS="companyid,setting_name"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="companyid" UNIQUE="false" FIELDS="companyid"/>
+        <INDEX NAME="setting_name" UNIQUE="false" FIELDS="setting_name"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="local_alx_api_reporting" COMMENT="Pre-built reporting table for fast API responses">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" COMMENT="User ID"/>
+        <FIELD NAME="companyid" TYPE="int" LENGTH="10" NOTNULL="true" COMMENT="Company ID"/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="true" COMMENT="Course ID"/>
+        <FIELD NAME="firstname" TYPE="char" LENGTH="100" NOTNULL="true" COMMENT="User first name"/>
+        <FIELD NAME="lastname" TYPE="char" LENGTH="100" NOTNULL="true" COMMENT="User last name"/>
+        <FIELD NAME="email" TYPE="char" LENGTH="100" NOTNULL="true" COMMENT="User email"/>
+        <FIELD NAME="coursename" TYPE="char" LENGTH="255" NOTNULL="true" COMMENT="Course full name"/>
+        <FIELD NAME="timecompleted" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" COMMENT="Course completion timestamp"/>
+        <FIELD NAME="timestarted" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" COMMENT="Course start timestamp"/>
+        <FIELD NAME="percentage" TYPE="number" LENGTH="5" DECIMALS="2" NOTNULL="true" DEFAULT="0" COMMENT="Completion percentage"/>
+        <FIELD NAME="status" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="not_started" COMMENT="Course status"/>
+        <FIELD NAME="last_updated" TYPE="int" LENGTH="10" NOTNULL="true" COMMENT="Last update timestamp for incremental sync"/>
+        <FIELD NAME="is_deleted" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" COMMENT="Soft delete flag"/>
+        <FIELD NAME="created_at" TYPE="int" LENGTH="10" NOTNULL="true" COMMENT="Record creation timestamp"/>
+        <FIELD NAME="updated_at" TYPE="int" LENGTH="10" NOTNULL="true" COMMENT="Record modification timestamp"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="unique_user_course" TYPE="unique" FIELDS="userid,courseid,companyid"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="companyid" UNIQUE="false" FIELDS="companyid"/>
+        <INDEX NAME="last_updated" UNIQUE="false" FIELDS="last_updated"/>
+        <INDEX NAME="userid_courseid" UNIQUE="false" FIELDS="userid,courseid"/>
+        <INDEX NAME="timecompleted" UNIQUE="false" FIELDS="timecompleted"/>
+        <INDEX NAME="status" UNIQUE="false" FIELDS="status"/>
+        <INDEX NAME="is_deleted" UNIQUE="false" FIELDS="is_deleted"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="local_alx_api_sync_status" COMMENT="Sync status tracking for incremental updates">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="companyid" TYPE="int" LENGTH="10" NOTNULL="true" COMMENT="Company ID"/>
+        <FIELD NAME="token_hash" TYPE="char" LENGTH="64" NOTNULL="true" COMMENT="API token hash for tracking"/>
+        <FIELD NAME="last_sync_timestamp" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" COMMENT="Last successful sync timestamp"/>
+        <FIELD NAME="sync_mode" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="auto" COMMENT="Sync mode: auto, manual, disabled"/>
+        <FIELD NAME="sync_window_hours" TYPE="int" LENGTH="3" NOTNULL="true" DEFAULT="24" COMMENT="Sync window in hours"/>
+        <FIELD NAME="last_sync_records" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" COMMENT="Number of records in last sync"/>
+        <FIELD NAME="last_sync_status" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="success" COMMENT="Last sync status"/>
+        <FIELD NAME="last_sync_error" TYPE="text" NOTNULL="false" COMMENT="Last sync error message"/>
+        <FIELD NAME="total_syncs" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" COMMENT="Total number of syncs"/>
+        <FIELD NAME="created_at" TYPE="int" LENGTH="10" NOTNULL="true" COMMENT="Record creation timestamp"/>
+        <FIELD NAME="updated_at" TYPE="int" LENGTH="10" NOTNULL="true" COMMENT="Record modification timestamp"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="unique_company_token" TYPE="unique" FIELDS="companyid,token_hash"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="companyid" UNIQUE="false" FIELDS="companyid"/>
+        <INDEX NAME="token_hash" UNIQUE="false" FIELDS="token_hash"/>
+        <INDEX NAME="last_sync_timestamp" UNIQUE="false" FIELDS="last_sync_timestamp"/>
+        <INDEX NAME="sync_mode" UNIQUE="false" FIELDS="sync_mode"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="local_alx_api_cache" COMMENT="Incremental data caching for performance optimization">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="cache_key" TYPE="char" LENGTH="255" NOTNULL="true" COMMENT="Cache key identifier"/>
+        <FIELD NAME="companyid" TYPE="int" LENGTH="10" NOTNULL="true" COMMENT="Company ID"/>
+        <FIELD NAME="cache_data" TYPE="text" NOTNULL="true" COMMENT="Cached data (JSON)"/>
+        <FIELD NAME="cache_timestamp" TYPE="int" LENGTH="10" NOTNULL="true" COMMENT="Cache creation timestamp"/>
+        <FIELD NAME="expires_at" TYPE="int" LENGTH="10" NOTNULL="true" COMMENT="Cache expiration timestamp"/>
+        <FIELD NAME="hit_count" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" COMMENT="Number of cache hits"/>
+        <FIELD NAME="last_accessed" TYPE="int" LENGTH="10" NOTNULL="true" COMMENT="Last access timestamp"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="unique_cache_key" TYPE="unique" FIELDS="cache_key,companyid"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="cache_key" UNIQUE="false" FIELDS="cache_key"/>
+        <INDEX NAME="companyid" UNIQUE="false" FIELDS="companyid"/>
+        <INDEX NAME="expires_at" UNIQUE="false" FIELDS="expires_at"/>
+        <INDEX NAME="cache_timestamp" UNIQUE="false" FIELDS="cache_timestamp"/>
+      </INDEXES>
+    </TABLE>
+  </TABLES>
+</XMLDB> 
