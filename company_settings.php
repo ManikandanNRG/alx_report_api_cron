@@ -42,43 +42,79 @@ $companies = local_alx_report_api_get_companies();
 
 // Handle form submission
 if ($action === 'save' && $companyid && confirm_sesskey()) {
-    $field_settings = [
-        'field_userid', 'field_firstname', 'field_lastname', 'field_email',
-        'field_courseid', 'field_coursename', 'field_timecompleted', 
-        'field_timecompleted_unix', 'field_timestarted', 'field_timestarted_unix',
-        'field_percentage', 'field_status'
-    ];
-    
-    // Save field settings
-    foreach ($field_settings as $setting) {
-        $value = optional_param($setting, 0, PARAM_INT);
-        local_alx_report_api_set_company_setting($companyid, $setting, $value);
-    }
-    
-    // Save course settings
-    $company_courses = local_alx_report_api_get_company_courses($companyid);
-    foreach ($company_courses as $course) {
-        $course_setting = 'course_' . $course->id;
-        $value = optional_param($course_setting, 0, PARAM_INT);
-        local_alx_report_api_set_company_setting($companyid, $course_setting, $value);
-    }
-    
-    // Save incremental sync settings
-    $sync_settings = [
-        'sync_mode', 'sync_window_hours', 'first_sync_hours', 'cache_enabled', 'cache_ttl_minutes'
-    ];
-    
-    foreach ($sync_settings as $setting) {
-        if ($setting === 'sync_mode') {
-            $value = optional_param($setting, 'auto', PARAM_ALPHA);
-        } else {
-            $value = optional_param($setting, 0, PARAM_INT);
+    try {
+        // Check if settings table exists
+        if (!$DB->get_manager()->table_exists('local_alx_api_settings')) {
+            throw new moodle_exception('Settings table does not exist. Please contact administrator to install/upgrade the plugin.');
         }
-        local_alx_report_api_set_company_setting($companyid, $setting, $value);
+        
+        $field_settings = [
+            'field_userid', 'field_firstname', 'field_lastname', 'field_email',
+            'field_courseid', 'field_coursename', 'field_timecompleted', 
+            'field_timecompleted_unix', 'field_timestarted', 'field_timestarted_unix',
+            'field_percentage', 'field_status'
+        ];
+        
+        // Save field settings
+        foreach ($field_settings as $setting) {
+            $value = optional_param($setting, 0, PARAM_INT);
+            $result = local_alx_report_api_set_company_setting($companyid, $setting, $value);
+            if (!$result) {
+                throw new moodle_exception("Failed to save setting: $setting");
+            }
+        }
+        
+        // Save course settings
+        $company_courses = local_alx_report_api_get_company_courses($companyid);
+        foreach ($company_courses as $course) {
+            $course_setting = 'course_' . $course->id;
+            $value = optional_param($course_setting, 0, PARAM_INT);
+            $result = local_alx_report_api_set_company_setting($companyid, $course_setting, $value);
+            if (!$result) {
+                throw new moodle_exception("Failed to save course setting: $course_setting");
+            }
+        }
+        
+        // Save incremental sync settings
+        $sync_settings = [
+            'sync_mode', 'sync_window_hours', 'first_sync_hours', 'cache_enabled', 'cache_ttl_minutes'
+        ];
+        
+        foreach ($sync_settings as $setting) {
+            if ($setting === 'sync_mode') {
+                $value = optional_param($setting, 'auto', PARAM_ALPHA);
+            } else {
+                $value = optional_param($setting, 0, PARAM_INT);
+            }
+            $result = local_alx_report_api_set_company_setting($companyid, $setting, $value);
+            if (!$result) {
+                throw new moodle_exception("Failed to save sync setting: $setting");
+            }
+        }
+        
+        redirect($PAGE->url->out(false, ['companyid' => $companyid]), 
+                 get_string('settings_saved', 'local_alx_report_api'), null, \core\output\notification::NOTIFY_SUCCESS);
+                 
+    } catch (Exception $e) {
+        // Log the error for debugging
+        error_log("ALX Report API Settings Save Error: " . $e->getMessage());
+        
+        // Show user-friendly error message
+        echo $OUTPUT->header();
+        echo '<div class="alert alert-danger">';
+        echo '<h4>Database Error</h4>';
+        echo '<p><strong>Error:</strong> ' . htmlspecialchars($e->getMessage()) . '</p>';
+        echo '<p><strong>Possible Solutions:</strong></p>';
+        echo '<ul>';
+        echo '<li>Check if the plugin database tables are properly installed</li>';
+        echo '<li>Try upgrading the plugin from the admin notifications</li>';
+        echo '<li>Contact your system administrator</li>';
+        echo '</ul>';
+        echo '<p><a href="' . $PAGE->url->out(false, ['companyid' => $companyid]) . '" class="btn btn-primary">Try Again</a></p>';
+        echo '</div>';
+        echo $OUTPUT->footer();
+        exit;
     }
-    
-    redirect($PAGE->url->out(false, ['companyid' => $companyid]), 
-             get_string('settings_saved', 'local_alx_report_api'), null, \core\output\notification::NOTIFY_SUCCESS);
 }
 
 // Handle copy from template

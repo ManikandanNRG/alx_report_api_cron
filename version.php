@@ -25,7 +25,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_alx_report_api';
-$plugin->version = 2024062401; // YYYYMMDDHH - Added automated cron sync system
+$plugin->version = 2024062403; // YYYYMMDDHH - Fixed admin page setup section error
 $plugin->requires = 2022112800; // Moodle 4.2.6
 $plugin->maturity = MATURITY_STABLE;
-$plugin->release = '1.1.0'; 
+$plugin->release = '1.1.1'; 

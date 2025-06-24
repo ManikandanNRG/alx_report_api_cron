@@ -230,27 +230,45 @@ function local_alx_report_api_get_company_setting($companyid, $setting_name, $de
 function local_alx_report_api_set_company_setting($companyid, $setting_name, $setting_value) {
     global $DB;
     
-    $existing = $DB->get_record('local_alx_api_settings', [
-        'companyid' => $companyid,
-        'setting_name' => $setting_name
-    ]);
+    // Check if table exists
+    if (!$DB->get_manager()->table_exists('local_alx_api_settings')) {
+        throw new dml_exception('Table local_alx_api_settings does not exist');
+    }
     
-    $time = time();
-    
-    if ($existing) {
-        // Update existing setting
-        $existing->setting_value = $setting_value;
-        $existing->timemodified = $time;
-        return $DB->update_record('local_alx_api_settings', $existing);
-    } else {
-        // Create new setting
-        $setting = new stdClass();
-        $setting->companyid = $companyid;
-        $setting->setting_name = $setting_name;
-        $setting->setting_value = $setting_value;
-        $setting->timecreated = $time;
-        $setting->timemodified = $time;
-        return $DB->insert_record('local_alx_api_settings', $setting);
+    try {
+        $existing = $DB->get_record('local_alx_api_settings', [
+            'companyid' => $companyid,
+            'setting_name' => $setting_name
+        ]);
+        
+        $time = time();
+        
+        if ($existing) {
+            // Update existing setting
+            $existing->setting_value = $setting_value;
+            $existing->timemodified = $time;
+            $result = $DB->update_record('local_alx_api_settings', $existing);
+        } else {
+            // Create new setting
+            $setting = new stdClass();
+            $setting->companyid = $companyid;
+            $setting->setting_name = $setting_name;
+            $setting->setting_value = $setting_value;
+            $setting->timecreated = $time;
+            $setting->timemodified = $time;
+            $result = $DB->insert_record('local_alx_api_settings', $setting);
+        }
+        
+        if (!$result) {
+            throw new dml_exception("Failed to save setting $setting_name for company $companyid");
+        }
+        
+        return true;
+        
+    } catch (Exception $e) {
+        // Log the specific error
+        error_log("ALX Report API: Error saving setting $setting_name for company $companyid: " . $e->getMessage());
+        throw $e;
     }
 }
 
@@ -813,7 +831,7 @@ function local_alx_report_api_determine_sync_mode($companyid, $token) {
     $sync_status = local_alx_report_api_get_sync_status($companyid, $token);
     
     if (!$sync_status) {
-        return 'first'; // First time sync
+        return 'full'; // First time sync - return all data
     }
     
     if ($sync_status->sync_mode === 'disabled') {
@@ -830,6 +848,12 @@ function local_alx_report_api_determine_sync_mode($companyid, $token) {
     
     if ($time_since_last_sync > $sync_window_seconds) {
         return 'full'; // Full sync if too much time passed
+    }
+    
+    // Check company setting for sync mode
+    $company_sync_mode = local_alx_report_api_get_company_setting($companyid, 'sync_mode', 'auto');
+    if ($company_sync_mode === 'manual' || $company_sync_mode === 'full') {
+        return 'full'; // Force full sync if company setting requires it
     }
     
     return 'incremental'; // Normal incremental sync

@@ -443,6 +443,16 @@ class local_alx_report_api_external extends external_api {
                 // Update sync status even for empty results
                 local_alx_report_api_update_sync_status($companyid, $token, 0, 'success');
                 return [];
+            } else {
+                // No course settings found, enable all company courses by default
+                self::debug_log("No course settings found - enabling all company courses");
+                $company_courses = local_alx_report_api_get_company_courses($companyid);
+                foreach ($company_courses as $course) {
+                    local_alx_report_api_set_company_setting($companyid, 'course_' . $course->id, 1);
+                }
+                // Refresh enabled courses list
+                $enabled_courses = local_alx_report_api_get_enabled_courses($companyid);
+                self::debug_log("Auto-enabled courses: " . implode(',', $enabled_courses));
             }
         }
 
@@ -527,11 +537,31 @@ class local_alx_report_api_external extends external_api {
                     'is_deleted' => 0
                 ]);
                 
+                self::debug_log("Total records in reporting table for company $companyid: $total_records");
+                
                 if ($total_records === 0) {
                     self::debug_log("Reporting table is empty - falling back to complex query");
                     // Fall back to the original complex query if reporting table is empty
-                    // This handles both incremental sync with empty table AND first sync with empty table
                     return self::get_company_course_progress_fallback($companyid, $limit, $offset);
+                } else {
+                    // Records exist but filtered out - check if course filtering is too restrictive
+                    if (!empty($enabled_courses)) {
+                        $course_filtered_count = $DB->count_records_sql(
+                            "SELECT COUNT(*) FROM {local_alx_api_reporting} 
+                             WHERE companyid = ? AND is_deleted = 0 AND courseid IN (" . implode(',', $enabled_courses) . ")",
+                            [$companyid]
+                        );
+                        self::debug_log("Records matching enabled courses: $course_filtered_count");
+                        
+                        if ($course_filtered_count === 0) {
+                            self::debug_log("No records match enabled courses - returning all records");
+                            // No records match enabled courses, return all records
+                            $sql = "SELECT * FROM {local_alx_api_reporting} 
+                                    WHERE companyid = :companyid AND is_deleted = 0 
+                                    ORDER BY userid, courseid";
+                            $records = $DB->get_records_sql($sql, ['companyid' => $companyid], $offset, $limit);
+                        }
+                    }
                 }
             }
             
